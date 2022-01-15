@@ -6,6 +6,18 @@ const fs = require('fs');
 const genPath = require('../shared/path');
 const avatar = require('../middlewares/avatar');
 const fileMid = require('../middlewares/fileMid');
+const path = require('path');
+
+// create image
+const createImage = (imageName, fileBuffer) => {
+  const bufferFile = Buffer.from(fileBuffer, 'base64');
+  // starter folder check
+  if (!fs.existsSync(genPath(''))) {
+    fs.mkdirSync(path.join(__dirname, '..', 'public'));
+    fs.mkdirSync(path.join(__dirname, '..', 'public', 'avatars'));
+  }
+  fs.writeFileSync(genPath(imageName), bufferFile);
+};
 
 // clear image
 const clearImage = (user) => {
@@ -22,11 +34,19 @@ const clearImage = (user) => {
 
 // Routes
 router.post('/', fileMid, avatar, async (req, res, next) => {
-  const { username, email, age, phone, filePath } = req.body;
+  const { username, email, age, phone, filePath, fileName, fileBuff } = req.body;
 
   const userModel = new User(username, email, filePath, age, phone);
   try {
     const [userAdded] = await addUser(userModel);
+
+    if (!userAdded) {
+      const error = new Error('Something went wrong!');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    createImage(fileName, fileBuff);
 
     res.status(201).json(userAdded);
   } catch (err) {
@@ -68,7 +88,7 @@ router.get('/', async (req, res, next) => {
 });
 
 router.put('/:id', fileMid, avatar, async (req, res, next) => {
-  const { username, email, age, phone, filePath } = req.body;
+  const { username, email, age, phone, filePath, fileName, fileBuff } = req.body;
   const { params } = req;
 
   const userModel = new User(username, email, filePath, age, phone);
@@ -84,6 +104,8 @@ router.put('/:id', fileMid, avatar, async (req, res, next) => {
       throw error;
     }
 
+    createImage(fileName, fileBuff);
+
     clearImage(user);
 
     res.status(200).json({ updatedUser });
@@ -94,7 +116,7 @@ router.put('/:id', fileMid, avatar, async (req, res, next) => {
 });
 
 router.patch('/:id', fileMid, avatar, async (req, res, next) => {
-  const { username, email, age, phone, filePath } = req.body;
+  const { username, email, age, phone, filePath, fileName, fileBuff } = req.body;
   const { params } = req;
 
   const userModel = new User(username, email, filePath, age, phone);
@@ -102,13 +124,15 @@ router.patch('/:id', fileMid, avatar, async (req, res, next) => {
   try {
     const user = await getUserById(params.id);
 
-    const patchedUser = await patchUser(params.id, userModel);
+    const [patchedUser] = await patchUser(params.id, userModel);
 
     if (!patchedUser) {
       const error = new Error('User not found!');
       error.statusCode = 404;
       throw error;
     }
+
+    createImage(fileName, fileBuff);
 
     clearImage(user);
 

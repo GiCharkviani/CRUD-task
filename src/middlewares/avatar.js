@@ -1,19 +1,9 @@
 const crypto = require('crypto');
-const fs = require('fs');
-const genPath = require('../shared/path');
-const path = require('path');
 
-const create_unique_image = (mimetype = 'jpg', fileBuffer, cb) => {
+const create_unique_image = (mimetype = 'jpg', cb) => {
   crypto.randomBytes(8, (_, buffer) => {
     const token = buffer.toString('hex');
     const file_name = token.concat('.').concat(mimetype);
-    const bufferFile = Buffer.from(fileBuffer, 'base64');
-    // starter folder check
-    if (!fs.existsSync(genPath(''))) {
-      fs.mkdirSync(path.join(__dirname, '..', 'public'));
-      fs.mkdirSync(path.join(__dirname, '..', 'public', 'avatars'));
-    }
-    fs.writeFileSync(genPath(file_name), bufferFile);
     cb(file_name);
   });
 };
@@ -23,7 +13,9 @@ module.exports = (req, res, next) => {
 
   if (file) {
     const mymetype = file.mimetype.split('/')[1];
-    create_unique_image(mymetype, file.buffer, (fileName) => {
+    create_unique_image(mymetype, (fileName) => {
+      body.fileBuff = file.buffer;
+      body.fileName = fileName;
       body.filePath = protocol.concat('://').concat(req.get('host')).concat('/').concat(fileName);
       next();
     });
@@ -40,7 +32,10 @@ module.exports = (req, res, next) => {
           error.statusCode = 400;
           throw error;
         }
-        create_unique_image(mymetype, body.avatar.split('base64,')[1], (fileName) => {
+        create_unique_image(mymetype, (fileName) => {
+          const takenBuf = body.avatar.split('base64,')[1];
+          body.fileBuff = takenBuf;
+          body.fileName = fileName;
           body.filePath = protocol.concat('://').concat(req.get('host')).concat('/').concat(fileName);
           next();
         });
@@ -48,13 +43,16 @@ module.exports = (req, res, next) => {
         next(err);
       }
     } else {
-      create_unique_image(undefined, body.avatar, (fileName) => {
+      create_unique_image(undefined, (fileName) => {
+        body.fileBuff = body.avatar;
+        body.fileName = fileName;
         body.filePath = protocol.concat('://').concat(req.get('host')).concat('/').concat(fileName);
         next();
       });
     }
   } else {
     body.filePath = '';
+    body.fileBuff = '';
     next();
   }
 };
